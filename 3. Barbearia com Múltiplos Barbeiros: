@@ -1,0 +1,76 @@
+import threading
+import time
+import random
+
+MAX_CADEIRAS = 5
+NUM_BARBEIROS = 2
+
+cadeiras_disponiveis = threading.Semaphore(MAX_CADEIRAS)
+barbeiros_disponiveis = threading.Semaphore(NUM_BARBEIROS)
+mutex = threading.Semaphore(1)
+
+class Cliente(threading.Thread):
+    def __init__(self, id):
+        threading.Thread.__init__(self)
+        self.id = id
+
+    def run(self):
+        global cadeiras_disponiveis
+        global barbeiros_disponiveis
+        global mutex
+
+        mutex.acquire()
+        if cadeiras_disponiveis._value > 0:
+            print(f"Cliente {self.id} entrou na barbearia e ocupou uma cadeira.")
+            cadeiras_disponiveis.acquire()
+            mutex.release()
+            barbeiros_disponiveis.acquire()
+            print(f"Cliente {self.id} está esperando por um barbeiro.")
+            barbeiros_disponiveis.release()
+            self.receber_corte()
+            cadeiras_disponiveis.release()
+        else:
+            mutex.release()
+            print(f"Cliente {self.id} não encontrou cadeiras disponíveis e foi embora.")
+
+    def receber_corte(self):
+        print(f"Cliente {self.id} está tendo o cabelo cortado.")
+        time.sleep(random.uniform(1, 3))
+        print(f"Cliente {self.id} terminou o corte de cabelo e saiu.")
+
+class Barbearia:
+    def __init__(self):
+        self.cliente_id = 1
+
+    def chegada_cliente(self):
+        global barbeiros_disponiveis
+        while True:
+            time.sleep(random.uniform(0.5, 1.5))
+            cliente = Cliente(self.cliente_id)
+            cliente.start()
+            self.cliente_id += 1
+
+class Barbeiro(threading.Thread):
+    def __init__(self, id):
+        threading.Thread.__init__(self)
+        self.id = id
+
+    def run(self):
+        global barbeiros_disponiveis
+        while True:
+            barbeiros_disponiveis.acquire()
+            print(f"Barbeiro {self.id} está chamando o próximo cliente.")
+            time.sleep(random.uniform(0.5, 1.5))
+            print(f"Barbeiro {self.id} está cortando o cabelo do cliente.")
+            time.sleep(random.uniform(2, 4))
+            print(f"Barbeiro {self.id} terminou de cortar o cabelo do cliente.")
+            barbeiros_disponiveis.release()
+
+if __name__ == "__main__":
+    barbearia = Barbearia()
+    barbeiros = [Barbeiro(i) for i in range(NUM_BARBEIROS)]
+
+    for barbeiro in barbeiros:
+        barbeiro.start()
+
+    barbearia.chegada_cliente()
