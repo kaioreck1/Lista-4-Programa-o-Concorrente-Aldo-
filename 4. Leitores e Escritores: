@@ -1,0 +1,81 @@
+import threading
+import time
+import random
+
+NUM_LEITORES = 5
+NUM_ESCRITORES = 2
+
+recurso_compartilhado = 0
+mutex_leitura = threading.Semaphore(1)
+escritores_esperando = threading.Semaphore(1)
+leitores_esperando = threading.Semaphore(1)
+escritores_esperando_contador = 0
+leitores_lendo = 0
+
+def escritor(id):
+    global recurso_compartilhado
+    global escritores_esperando_contador
+
+    escritores_esperando.acquire()
+    escritores_esperando_contador += 1
+    escritores_esperando.release()
+
+    leitores_esperando.acquire()
+    mutex_leitura.acquire()
+    escritores_esperando.acquire()
+    escritores_esperando_contador -= 1
+
+    escritores_esperando.release()
+    leitores_esperando.release()
+
+    novo_valor = random.randint(1, 100)
+    print(f"Escritor {id} está escrevendo o valor {novo_valor} no recurso.")
+    time.sleep(random.uniform(1, 2))
+    recurso_compartilhado = novo_valor
+
+    print(f"Escritor {id} terminou de escrever.")
+
+    mutex_leitura.release()
+
+def leitor(id):
+    global leitores_lendo
+
+    leitores_esperando.acquire()
+    leitores_esperando.release()
+
+    mutex_leitura.acquire()
+    leitores_lendo += 1
+    if leitores_lendo == 1:
+        escritores_esperando.acquire()
+    mutex_leitura.release()
+
+    # Ler recurso compartilhado
+    print(f"Leitor {id} está lendo o valor {recurso_compartilhado}.")
+    time.sleep(random.uniform(1, 2))
+
+    mutex_leitura.acquire()
+    leitores_lendo -= 1
+    if leitores_lendo == 0:
+        escritores_esperando.release()
+    mutex_leitura.release()
+
+    print(f"Leitor {id} terminou de ler.")
+
+def main():
+    escritores = [threading.Thread(target=escritor, args=(i,)) for i in range(NUM_ESCRITORES)]
+    leitores = [threading.Thread(target=leitor, args=(i,)) for i in range(NUM_LEITORES)]
+
+    for escritor_thread in escritores:
+        escritor_thread.start()
+
+    for leitor_thread in leitores:
+        leitor_thread.start()
+
+    for escritor_thread in escritores:
+        escritor_thread.join()
+
+    for leitor_thread in leitores:
+        leitor_thread.join()
+
+if __name__ == "__main__":
+    main()
